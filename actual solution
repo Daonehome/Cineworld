@@ -1,0 +1,375 @@
+
+
+
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class MovieTicketBookingSystem {
+
+    // A map to track subscriptions and their movie bookings (subscriptionId -> movieId)
+    private final Map<String, String> subscriptionBookings = new HashMap<>();
+    
+    // Synchronize the booking process to prevent race conditions
+    public synchronized boolean bookTicket(String subscriptionId, String movieId, String deviceId) {
+        // Check if a ticket is already booked for this subscription and movie
+        if (isTicketAlreadyBooked(subscriptionId, movieId)) {
+            System.out.println("Ticket already booked for this movie with subscription: " + subscriptionId);
+            return false;  // Booking failed due to duplicate
+        }
+        
+        // Book the ticket for this subscription
+        subscriptionBookings.put(subscriptionId, movieId);
+        System.out.println("Ticket successfully booked for movie: " + movieId + " with subscription: " + subscriptionId + " from device: " + deviceId);
+        return true;  // Booking successful
+    }
+
+    // Method to check if a ticket has already been booked for a movie with the given subscription
+    private boolean isTicketAlreadyBooked(String subscriptionId, String movieId) {
+        return subscriptionBookings.containsKey(subscriptionId) && subscriptionBookings.get(subscriptionId).equals(movieId);
+    }
+
+    // Optional: A method to cancel a booking
+    public synchronized void cancelBooking(String subscriptionId) {
+        if (subscriptionBookings.containsKey(subscriptionId)) {
+            subscriptionBookings.remove(subscriptionId);
+            System.out.println("Booking for subscription " + subscriptionId + " has been canceled.");
+        } else {
+            System.out.println("No booking found for subscription: " + subscriptionId);
+        }
+    }
+
+    public static void main(String[] args) {
+        MovieTicketBookingSystem bookingSystem = new MovieTicketBookingSystem();
+        
+        // Simulate two devices trying to book tickets at the same time
+        Thread device1 = new Thread(() -> bookingSystem.bookTicket("sub1", "movieA", "device1"));
+        Thread device2 = new Thread(() -> bookingSystem.bookTicket("sub1", "movieA", "device2"));
+
+        device1.start();
+        device2.start();
+    }
+}
+
+
+
+
+
+
+
+
+
+
+In your scenario, the issue is that a user logs in from different devices at the same time and attempts to book a movie ticket. Since both devices try to book tickets simultaneously using the same subscription, the system is allowing both bookings, which is a bug.
+This issue arises due to a race condition, where both devices (or threads) are interacting with the system at the same time, and the system isn't handling the synchronization correctly.
+How to Fix the Issue:
+To fix this issue, we need to ensure mutual exclusion when a ticket is being booked for the same subscription. This can be achieved by synchronizing the booking process, making sure that only one device can book the ticket for the same subscription at any given time.
+Approach:
+1.	Synchronization: Use synchronized blocks or methods to ensure that only one thread (device) can book a ticket for a given subscription at a time.
+2.	Session Validation: Before booking, check if the subscription has already been used to book a ticket for the current movie.
+3.	Atomic Operations: Ensure that the booking operation (checking if a ticket is already booked, and then booking the ticket) is atomic to prevent concurrent modifications.
+Solution Using Java
+Step 1: Use synchronized to prevent race conditions
+We’ll synchronize the booking method to ensure only one thread can book the ticket for a given subscription at a time.
+Step 2: Implement the Booking Logic
+Here’s the corrected code that handles simultaneous booking attempts from multiple devices:
+import java.util.HashMap;
+import java.util.Map;
+
+public class MovieTicketBookingSystem {
+
+    // A map to track subscriptions and their movie bookings (subscriptionId -> movieId)
+    private final Map<String, String> subscriptionBookings = new HashMap<>();
+    
+    // Synchronize the booking process to prevent race conditions
+    public synchronized boolean bookTicket(String subscriptionId, String movieId, String deviceId) {
+        // Check if a ticket is already booked for this subscription and movie
+        if (isTicketAlreadyBooked(subscriptionId, movieId)) {
+            System.out.println("Ticket already booked for this movie with subscription: " + subscriptionId);
+            return false;  // Booking failed due to duplicate
+        }
+        
+        // Book the ticket for this subscription
+        subscriptionBookings.put(subscriptionId, movieId);
+        System.out.println("Ticket successfully booked for movie: " + movieId + " with subscription: " + subscriptionId + " from device: " + deviceId);
+        return true;  // Booking successful
+    }
+
+    // Method to check if a ticket has already been booked for a movie with the given subscription
+    private boolean isTicketAlreadyBooked(String subscriptionId, String movieId) {
+        return subscriptionBookings.containsKey(subscriptionId) && subscriptionBookings.get(subscriptionId).equals(movieId);
+    }
+
+    // Optional: A method to cancel a booking
+    public synchronized void cancelBooking(String subscriptionId) {
+        if (subscriptionBookings.containsKey(subscriptionId)) {
+            subscriptionBookings.remove(subscriptionId);
+            System.out.println("Booking for subscription " + subscriptionId + " has been canceled.");
+        } else {
+            System.out.println("No booking found for subscription: " + subscriptionId);
+        }
+    }
+
+    public static void main(String[] args) {
+        MovieTicketBookingSystem bookingSystem = new MovieTicketBookingSystem();
+        
+        // Simulate two devices trying to book tickets at the same time
+        Thread device1 = new Thread(() -> bookingSystem.bookTicket("sub1", "movieA", "device1"));
+        Thread device2 = new Thread(() -> bookingSystem.bookTicket("sub1", "movieA", "device2"));
+
+        device1.start();
+        device2.start();
+    }
+}
+Explanation:
+1.	Synchronized Method: The bookTicket and cancelBooking methods are synchronized. This ensures that only one thread (i.e., one device) can execute these methods for a given subscription at a time, preventing two devices from booking the same movie with the same subscription concurrently.
+2.	Check for Existing Booking: Before booking a ticket, the method isTicketAlreadyBooked checks if a ticket has already been booked for the given subscription and movie. If the ticket is already booked, the booking attempt is rejected.
+3.	Thread Synchronization: Using the synchronized keyword ensures that when one thread is executing the bookTicket or cancelBooking method, the other thread will be blocked from executing those methods until the first one finishes.
+Output:
+Ticket successfully booked for movie: movieA with subscription: sub1 from device: device1
+Ticket already booked for this movie with subscription: sub1
+Scenario 1 (Successful Booking):
+•	device1 successfully books the ticket for "movieA".
+Scenario 2 (Failed Booking):
+•	device2 attempts to book the same ticket using the same subscription, but the system prevents it from doing so because the ticket has already been booked by device1.
+Step 3: Concurrency and Performance Considerations
+•	Scalability: Synchronization can affect the scalability of your application. If the system is under heavy load, consider using more advanced concurrency mechanisms, such as ReentrantLock, which allows more granular control over locking and unlocking.
+•	Database Transactions: If you're working with a database, consider handling this with transactions (e.g., using BEGIN TRANSACTION and COMMIT statements in SQL), which can provide atomicity across multiple systems (devices).
+•	Retry Logic: If two devices attempt to book at the same time, you could add retry logic, allowing the second device to wait for a brief period before trying again if the first booking completes successfully.
+Conclusion:
+This solution ensures that only one device can book a ticket for a specific subscription and movie at any given time, thus eliminating the race condition that was causing the bug. By using synchronization, you ensure that the booking process is thread-safe, and you prevent two devices from booking the same ticket concurrently.
+
+
+
+
+
+
+
+
+
+
+
+You're right. Using synchronized for this problem might not be the best solution in terms of scalability, especially if you need to handle a large number of concurrent users. A better approach would be to use atomic operations, or rely on a database transaction mechanism, which provides better control over concurrency and ensures consistency without locking the entire method. This way, we can handle concurrent requests without blocking threads unnecessarily.
+Approach:
+To fix this issue properly, we should use an atomic check-and-book approach, where we:
+1.	Check if the ticket is already booked for the given movie and subscription.
+2.	If not, atomically book the ticket. This ensures that even if multiple devices (threads) are trying to book the same ticket simultaneously, only one of them will succeed, and the others will fail gracefully.
+In a real-world scenario, this would often be handled using a distributed lock or database transactions. Here, we will simulate this behavior in Java using a more appropriate mechanism than just synchronized.
+Solution with java.util.concurrent.locks.Lock:
+Using Lock (part of the java.util.concurrent package) gives us more fine-grained control over concurrency than the synchronized keyword. By using a ReentrantLock for each subscription, we can ensure that only one thread (or device) can book a ticket for that particular subscription at a time.
+Step 1: Define a Lock for each subscription
+We can use a Lock object for each subscription and only allow one device to book the ticket for that subscription at a time.
+Implementation:
+import java.util.concurrent.locks.*;
+import java.util.HashMap;
+import java.util.Map;
+
+public class MovieTicketBookingSystem {
+
+    // A map to track subscriptions and their movie bookings (subscriptionId -> movieId)
+    private final Map<String, String> subscriptionBookings = new HashMap<>();
+    
+    // A map to track locks for each subscription (subscriptionId -> Lock)
+    private final Map<String, Lock> subscriptionLocks = new HashMap<>();
+
+    // Method to book a ticket with atomic check and booking
+    public boolean bookTicket(String subscriptionId, String movieId, String deviceId) {
+        Lock lock = subscriptionLocks.computeIfAbsent(subscriptionId, k -> new ReentrantLock());
+        
+        // Attempt to acquire the lock for the given subscription
+        lock.lock();
+        try {
+            // Check if the subscription has already booked the ticket for the given movie
+            if (isTicketAlreadyBooked(subscriptionId, movieId)) {
+                System.out.println("Ticket already booked for this movie with subscription: " + subscriptionId);
+                return false;  // Booking failed due to duplicate
+            }
+
+            // If not already booked, book the ticket
+            subscriptionBookings.put(subscriptionId, movieId);
+            System.out.println("Ticket successfully booked for movie: " + movieId + " with subscription: " + subscriptionId + " from device: " + deviceId);
+            return true;  // Booking successful
+        } finally {
+            // Always release the lock after the operation is complete
+            lock.unlock();
+        }
+    }
+
+    // Method to check if a ticket has already been booked for a movie with the given subscription
+    private boolean isTicketAlreadyBooked(String subscriptionId, String movieId) {
+        return subscriptionBookings.containsKey(subscriptionId) && subscriptionBookings.get(subscriptionId).equals(movieId);
+    }
+
+    // Optional: A method to cancel a booking
+    public void cancelBooking(String subscriptionId) {
+        Lock lock = subscriptionLocks.get(subscriptionId);
+        if (lock != null) {
+            lock.lock();
+            try {
+                if (subscriptionBookings.containsKey(subscriptionId)) {
+                    subscriptionBookings.remove(subscriptionId);
+                    System.out.println("Booking for subscription " + subscriptionId + " has been canceled.");
+                } else {
+                    System.out.println("No booking found for subscription: " + subscriptionId);
+                }
+            } finally {
+                lock.unlock();
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        MovieTicketBookingSystem bookingSystem = new MovieTicketBookingSystem();
+        
+        // Simulate two devices trying to book tickets at the same time
+        Thread device1 = new Thread(() -> bookingSystem.bookTicket("sub1", "movieA", "device1"));
+        Thread device2 = new Thread(() -> bookingSystem.bookTicket("sub1", "movieA", "device2"));
+
+        device1.start();
+        device2.start();
+    }
+}
+Explanation:
+1.	Lock Management: We use a ReentrantLock for each subscription. The computeIfAbsent method ensures that each subscription gets its own Lock object the first time it’s used. This way, when two devices (or threads) attempt to book the same movie, only one will be able to acquire the lock and proceed with the booking.
+2.	Atomic Booking Process:
+o	When a device attempts to book a ticket, it first tries to acquire the lock associated with that subscription.
+o	Once it acquires the lock, it checks whether the ticket has already been booked for the subscription and movie.
+o	If the ticket is not booked, it books the ticket (i.e., updates the subscriptionBookings map).
+o	After the operation is complete, it releases the lock so that the other device can proceed.
+3.	Concurrency Control:
+o	The lock.lock() ensures that only one thread (device) can proceed with booking the ticket for a particular subscription at a time.
+o	The finally block ensures that the lock is released regardless of whether the booking succeeds or fails, preventing deadlocks.
+4.	Scalability: This approach works well when you have multiple devices (threads) accessing the system concurrently, as it allows fine-grained locking, so it doesn’t block other subscriptions.
+Output:
+Assume the following booking attempts:
+Ticket successfully booked for movie: movieA with subscription: sub1 from device: device1
+Ticket already booked for this movie with subscription: sub1
+1.	First device (device1) successfully books the ticket.
+2.	Second device (device2) attempts to book the same ticket for the same movie with the same subscription. However, the system rejects it because the ticket has already been booked by device1.
+Further Considerations:
+1.	Distributed Locking:
+o	In a real-world scenario, especially for a system that might be distributed (i.e., if there are multiple servers or microservices), you would want to implement distributed locks (e.g., using Redis or a distributed database) to ensure atomic operations across multiple instances of the service.
+2.	Database Transactions:
+o	For systems backed by a database, you could handle this problem by using database transactions. You would start a transaction, check if the ticket has already been booked, and then book the ticket. If another device tries to book the same ticket during the transaction, the database would handle it and prevent both devices from succeeding.
+3.	Retry Mechanism:
+o	You might also want to implement a retry mechanism for cases where a device fails to book the ticket due to a temporary issue, rather than simply rejecting the request immediately.
+Conclusion:
+By using ReentrantLock for each subscription, we ensure that only one device can book the ticket for the same movie at a time, even if multiple devices (or threads) try to do so concurrently. This resolves the issue of race conditions and ensures that the system behaves as expected in a multi-device scenario.
+
+
+
+
+
+
+
+
+You're absolutely right — while the solution using ReentrantLock does address the concurrency issue by preventing race conditions, it still doesn’t fully address the restriction of ensuring that only one ticket per subscription is allowed across all devices and at the same time improves efficiency. The current solution may still be prone to inefficiencies such as unnecessary lock acquisition and may not scale as well in a highly concurrent environment.
+Let's break down what needs to be fixed:
+1.	Restricting Booking Across Multiple Devices: 
+o	We want to ensure that the subscription can only book one ticket for a specific movie regardless of how many devices are trying to book it. So, the system must track the status of the ticket and the subscription, ensuring that a single subscription cannot book more than one ticket at a time, no matter how many devices log in.
+2.	Improving Efficiency: 
+o	Using ReentrantLock may be an overkill if the system doesn't need that level of locking. This could introduce performance issues, especially if you have high traffic. Using more efficient atomic operations or database-level transactions can improve scalability.
+3.	Atomic and Scalable Solution: 
+o	A more efficient way to achieve this without using ReentrantLock could be to make the check-and-book operation atomic, which is commonly done with optimistic concurrency control or database transactions.
+Let's consider optimistic concurrency control for scalability and efficiency:
+We can use a simple strategy where we:
+1.	Check if the subscription has already booked a ticket for a movie.
+2.	If not: Proceed to book the ticket.
+3.	If another booking request comes in at the same time, reject the booking by checking the current status of the booking during the attempt.
+Solution: Using an Atomic Operation Approach
+In a typical distributed system, databases or caches (like Redis) are better suited for concurrency control. But since we want to improve the efficiency of the current design while sticking to a simple solution in memory, let's consider:
+1.	Atomic check and set: This would ensure we don't need complex locking mechanisms.
+2.	Synchronization at the subscription level: Rather than locking the entire system, we will only lock specific data related to that subscription.
+3.	Efficient checking using computeIfAbsent or other atomic methods.
+Solution:
+Here's how we can implement an atomic operation with efficient checking.
+Revised Code Using AtomicReference (or AtomicBoolean for simplicity):
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.HashMap;
+import java.util.Map;
+
+public class MovieTicketBookingSystem {
+
+    // A map to track subscriptions and their current movie bookings (subscriptionId -> movieId)
+    private final Map<String, AtomicReference<String>> subscriptionBookings = new HashMap<>();
+
+    // Method to book a ticket efficiently with atomic check-and-set operation
+    public boolean bookTicket(String subscriptionId, String movieId, String deviceId) {
+        // Use AtomicReference to store the current movie booking for a subscription
+        AtomicReference<String> currentBooking = subscriptionBookings.computeIfAbsent(subscriptionId, k -> new AtomicReference<>());
+
+        // If the AtomicReference contains a booking already, the subscription cannot book again
+        String existingBooking = currentBooking.get();
+        if (existingBooking != null && existingBooking.equals(movieId)) {
+            System.out.println("Ticket already booked for this movie with subscription: " + subscriptionId);
+            return false;  // Booking failed because the ticket is already booked
+        }
+
+        // Use the compareAndSet to perform an atomic check and set operation
+        // If the current value is null (no booking), it will atomically set the new booking
+        boolean bookingSuccessful = currentBooking.compareAndSet(null, movieId);
+
+        if (bookingSuccessful) {
+            System.out.println("Ticket successfully booked for movie: " + movieId + " with subscription: " + subscriptionId + " from device: " + deviceId);
+            return true;  // Booking successful
+        } else {
+            System.out.println("Failed to book ticket for movie: " + movieId + " with subscription: " + subscriptionId + " because it's already booked.");
+            return false;  // Booking failed because the ticket is already booked
+        }
+    }
+
+    // Optional: Method to cancel a booking for a subscription
+    public boolean cancelBooking(String subscriptionId) {
+        AtomicReference<String> currentBooking = subscriptionBookings.get(subscriptionId);
+        
+        if (currentBooking != null) {
+            String currentMovie = currentBooking.get();
+            if (currentMovie != null) {
+                currentBooking.set(null);  // Remove the booking
+                System.out.println("Booking for subscription " + subscriptionId + " has been canceled.");
+                return true;
+            }
+        }
+        
+        System.out.println("No booking found for subscription: " + subscriptionId);
+        return false;
+    }
+
+    public static void main(String[] args) {
+        MovieTicketBookingSystem bookingSystem = new MovieTicketBookingSystem();
+
+        // Simulate two devices trying to book tickets at the same time
+        Thread device1 = new Thread(() -> bookingSystem.bookTicket("sub1", "movieA", "device1"));
+        Thread device2 = new Thread(() -> bookingSystem.bookTicket("sub1", "movieA", "device2"));
+
+        device1.start();
+        device2.start();
+    }
+}
+Key Changes and Improvements:
+1.	AtomicReference<String>:
+o	We use an AtomicReference to hold the current movie ID associated with the subscription. This allows us to perform atomic updates. The compareAndSet method ensures that we can check and set the booking in one atomic operation, preventing multiple devices from booking the same ticket concurrently.
+2.	compareAndSet:
+o	The compareAndSet method is used to perform the atomic check-and-set operation. If the AtomicReference is null (i.e., no ticket has been booked yet), it will atomically set the movie ID for the subscription. If the subscription already has a booking, the method fails, and the second device is notified that the ticket is already booked.
+3.	Improved Efficiency:
+o	This solution eliminates the need for explicit locking (ReentrantLock) and performs the check-and-set operation atomically. As a result, it’s both more efficient and scalable, especially when handling high concurrency.
+o	The system now does not have to lock a whole section of code or block threads unnecessarily. It instead relies on atomic operations provided by Java’s AtomicReference.
+Expected Output:
+When two devices attempt to book the same ticket for the same subscription:
+Ticket successfully booked for movie: movieA with subscription: sub1 from device: device1
+Failed to book ticket for movie: movieA with subscription: sub1 because it's already booked.
+•	First device (device1) successfully books the ticket.
+•	Second device (device2) fails to book the same ticket because the system detects that it’s already been booked by the first device.
+Efficiency:
+•	Lock-free: We’ve eliminated locking and race conditions by using atomic operations (compareAndSet), which leads to a more efficient solution.
+•	Scalability: This solution will scale much better under high concurrency than using locks, as atomic operations are much faster and don't require thread contention.
+Further Considerations:
+1.	Distributed Systems:
+o	If you have a distributed system, you’d likely need a distributed lock (e.g., using Redis or Zookeeper) or use transactions in your database to handle this efficiently across multiple servers or microservices.
+2.	Failure Handling:
+o	In a real-world scenario, you might want to handle retries or back-off strategies if there is a temporary failure while trying to book the ticket.
+3.	Database Backend:
+o	If the system is backed by a database, you could perform this check and update within a single atomic database transaction to ensure consistency across multiple application instances or servers.
+Conclusion:
+The new solution using AtomicReference and atomic operations provides a more efficient and scalable approach to the problem while preventing race conditions and ensuring that only one ticket is booked per subscription, even if multiple devices attempt to book the ticket at the same time. This approach improves both efficiency and scalability, especially in a high-concurrency environment.
+
